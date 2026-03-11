@@ -3,8 +3,8 @@ import time
 from yolo_detector import YoloDetector
 from tracker import Tracker
 
-MODEL_PATH="./models/best.pt"
-VIDEO_PATH="./2024-10-25_1848.mp4"
+MODEL_PATH="./runs/detect/train/weights/best.pt"
+VIDEO_PATH="./rolling_video/2024-10-25_1848.mp4"
 YOLO_INPUT_SIZE=416
 DESIRED_FPS=3
 
@@ -30,46 +30,19 @@ def main():
     cap=cv2.VideoCapture(VIDEO_PATH)
     if not cap.isOpened():
         exit()
-
-    # Track last known centroid/time per track ID (for speed calculations)
-    track_history = {}  # {track_id: (cx, cy, timestamp)}
-
     frame_delay=int(1000/DESIRED_FPS)
     while True:
         ret,frame=cap.read()
         if not ret: break
-
-        # Ensure the model sees RGB, not BGR (OpenCV uses BGR by default)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
         orig_h,orig_w=frame.shape[:2]
-        resized,scale,pad_w,pad_h=resize_with_padding(frame_rgb,YOLO_INPUT_SIZE)
-
+        resized,scale,pad_w,pad_h=resize_with_padding(frame,YOLO_INPUT_SIZE)
         detections=detector.detect(resized)
-
+        print('detections:', len(detections))
         tracking_ids,boxes=tracker.track(detections,resized)
-        now=time.time()
-
         for tid,bbox in zip(tracking_ids,boxes):
             cb=correct_bbox(bbox,scale,pad_w,pad_h,orig_w,orig_h)
-            cx=(cb[0]+cb[2])/2
-            cy=(cb[1]+cb[3])/2
-
-            speed=None
-            if tid in track_history:
-                prev_x,prev_y,prev_t = track_history[tid]
-                dt = now - prev_t if now>prev_t else 1e-6
-                dx = cx - prev_x
-                dy = cy - prev_y
-                speed = ((dx*dx + dy*dy)**0.5)/dt
-            track_history[tid] = (cx, cy, now)
-
-            # Draw bounding box + ID + speed
             cv2.rectangle(frame,(cb[0],cb[1]),(cb[2],cb[3]),(0,0,255),2)
-            cv2.putText(frame,f"ID:{tid}",(cb[0],cb[1]-20),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2)
-            if speed is not None:
-                cv2.putText(frame,f"{speed:.1f}px/s",(cb[0],cb[1]-5),cv2.FONT_HERSHEY_SIMPLEX,0.45,(0,255,255),1)
-
+            cv2.putText(frame,str(tid),(cb[0],cb[1]-10),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2)
         cv2.imshow("Frame",frame)
         key=cv2.waitKey(frame_delay)&0xFF
         if key==ord("q") or key==27:

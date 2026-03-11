@@ -1,0 +1,9 @@
+# YOLOv8 dataset config for bee detection
+# Put your images under ./data/images and your labels under ./data/labels
+# Each label file should match the image name (e.g. ezgif-frame-001.jpg -> ezgif-frame-001.txt)
+
+train: ./data/images
+val: ./data/images
+
+nc: 1
+names: ["bee"]
